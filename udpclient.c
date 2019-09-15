@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -14,19 +15,30 @@
 
 #DEFINE SERVER_PORT 41026;
 
-CLIENT_USAGE[] = \
-  "Usage: student0[0/1/2/6].cse.nd.edu 41026 [filename.txt or \"message\"]";
-
-
+const char CLIENT_USAGE[] = \
+  "Usage: ./udpclient student0[0/1/2/6].cse.nd.edu 41026 [filename.txt or \"message\"]";
 
 int main(int argc, char* argv[]) {
 
   struct sockaddr_in addr;
+  struct stat s;
 
   // Get command line arguments
   char* hostname = argv[1];
   int port = atoi(argv[2]);
   char* message = argv[3];
+  bool isFile = false;
+
+  char* file_end = ".txt";
+
+  if (strstr(message, file_end) != NULL) {
+    isFile = true;
+    if ((int fd = open(message, O_RDONLY) < 0) {
+      fprintf(stderr, "ERROR: Opening message - %s\n", strerror(errno));
+      close(fd);
+      return EXIT_FAILURE;
+    }
+  }
 
   addr.sin_family = AF_INET;
   addr.
@@ -47,17 +59,43 @@ int main(int argc, char* argv[]) {
   }
 
   // Get public key
-  char* cpub = getPubKey();
+  char cpub[BIFSIZ] = getPubKey();
 
   // Sends the public key to the Server
+  if ((int s = sendto(sockfd, cpub, BUFSIZ)) < 0) {
+    fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
 
+  // Recieve and decrypt the public key of the Server
+  char spub[BUFSIZ] = "";
+  if ((int t = recvfrom(sockfd, *spub, BUFSIZ)) == 0) {
+    fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
+  char spub[BUFSIZ] = decrypt(spub);
 
-  // Decrypt the public key of the Server
-
-  // Encrypt the message with the publiv key of the Server
-
+  // Encrypt the message with the public key of the Server
+  if (isFile) {
+    char emess[BUFSIZ] = encrypt(fd, cpub);
+  }
+  else {
+    char emess[BUFSIZ] = encrypt(message, spub);
+  }
+  if ((int s = sendto(sockfd, emess, BUFSIZ)) < 0) {
+    fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
   // Send the checksum to the server
-
+  unsigned long csum = checksum(message);
+  if ((int s = sendto(sockfd, csum, BUFSIZ)) < 0) {
+    fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
   // Recieve the checksum and check it
   return EXIT_SUCCESS;
 }
