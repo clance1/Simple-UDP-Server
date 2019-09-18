@@ -22,9 +22,10 @@ int main(int argc, char* argv[]) {
 
   // Get command line arguments
   char* hostname = argv[1];
-  int port = stoi(argv[2]);
+  int port = atoi(argv[2]);
   char* message = argv[3];
   bool isFile = false;
+  int fd;
 
   char* file_end = ".txt";
 
@@ -38,7 +39,7 @@ int main(int argc, char* argv[]) {
   struct sockaddr_in saddr;
 
   saddr.sin_family = AF_INET;
-  saddr.sin_addr.s_addr = INADDR_ANY:
+  saddr.sin_addr.s_addr = INADDR_ANY;
   saddr.sin_port = htons(port);
 
 
@@ -46,7 +47,7 @@ int main(int argc, char* argv[]) {
 
   if (strstr(message, file_end) != NULL) {
     isFile = true;
-	int fd = open(message, O_RDONLY);
+	fd = open(message, O_RDONLY);
     if (fd < 0) {
       fprintf(stderr, "ERROR: Opening message - %s\n", strerror(errno));
       close(fd);
@@ -66,7 +67,7 @@ int main(int argc, char* argv[]) {
   char* cpub = getPubKey();
 
   // Sends the public key to the Server
-  int s = sendto(sockfd, cpub, BUFSIZ, MSG_CONFIRM, &saddr, sizeof(saddr));
+  int s = sendto(sockfd, (const char *) cpub, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
   if (s < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
@@ -74,37 +75,43 @@ int main(int argc, char* argv[]) {
   }
 
   // Recieve and decrypt the public key of the Server
-  char spub[BUFSIZ] = "";
+  char spub_rec[BUFSIZ] = "";
   int l;
-  if ((int t = recvfrom(sockfd, *spub, BUFSIZ, MSG_CONFIRM, &saddr, &l)) == 0) {
+  int t = recvfrom(sockfd, (char *) spub_rec, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &saddr, &l);
+  if (s == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
   }
-  char* spub = decrypt(spub);
+  char* spub = decrypt(spub_rec);
 
   // Encrypt the message with the public key of the Server
+  char* emess = "";
   if (isFile) {
-    char emess[BUFSIZ] = encrypt(fd, cpub);
+    emess = encrypt(fd, cpub);
   }
   else {
-    char emess[BUFSIZ] = encrypt(message, spub);
+    emess = encrypt(message, spub);
   }
-  if ((int s = sendto(sockfd, emess, BUFSIZ, MSG_CONFIRM, &saddr, sizeof(saddr))) < 0) {
+
+  int r = sendto(sockfd, (const char *) emess, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
+  if (r < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
   }
   // Send the checksum to the server
   unsigned long csum = checksum(message);
-  if ((int s = sendto(sockfd, csum, BUFSIZ, MSG_CONFIRM, &saddr, sizeof(saddr))) < 0) {
+  int x = sendto(sockfd, (const char *) csum, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
+  if (x < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
   }
   unsigned long scsum;
   // Recieve the checksum and check it
-  if ((int t = recvfrom(sockfd, *scsum, BUFSIZ, MSG_CONFIRM, &saddr, &l)) == 0) {
+  int y = recvfrom(sockfd, (char *) scsum, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &saddr, &l);
+  if (y == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
