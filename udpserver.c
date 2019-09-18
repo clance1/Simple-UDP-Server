@@ -27,6 +27,7 @@ bool comp_csum(unsigned long csum, unsigned long ocsum) {
 int main(int argc, char* argv[]) {
 
   struct sockaddr_in saddr, caddr;
+  printf("TEST");
 
   // Get command line arguments
   int port = atoi(argv[1]);
@@ -38,6 +39,7 @@ int main(int argc, char* argv[]) {
 
   // Run socket
   int sockfd = -1;
+  printf("Booting up server on %d", port);
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sockfd < 0) {
     fprintf(stderr, "ERROR: Socket error - %s\n", strerror(errno));
@@ -89,7 +91,7 @@ int main(int argc, char* argv[]) {
   // Receive checksum
   unsigned long ocsum = 0;
   int y = recvfrom(sockfd, (const char *) ocsum, BUFSIZ, MSG_WAITALL, (const struct sockaddr *) &caddr, &l);
-  printf("Recieved checksum: %d\n", ocsum);
+  printf("Recieved checksum: %lu\n", ocsum);
   if (y == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
