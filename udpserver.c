@@ -100,7 +100,6 @@ int main(int argc, char* argv[]) {
 	  printf("Checksums match!\n");
 	  char* csum_s = malloc(4096);
 	  sprintf(csum_s, "%lu", csum);
-	  printf("CHAR: %s\n", csum_s);
 	  sendto(sockfd, (const char *) csum_s, BUFSIZ, 0, (const struct sockaddr *) &caddr, sizeof(saddr));
   }
   }

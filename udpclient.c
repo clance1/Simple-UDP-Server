@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -18,6 +19,17 @@
 const char CLIENT_USAGE[] = \
   "Usage: ./udpclient student0[0/1/2/6].cse.nd.edu 41026 [filename.txt or \"message\"]";
 
+double time_diff(struct timeval x , struct timeval y) {
+	double x_ms , y_ms , diff;
+			
+	x_ms = (double)x.tv_sec*1000000 + (double)x.tv_usec;
+	y_ms = (double)y.tv_sec*1000000 + (double)y.tv_usec;
+						
+	diff = (double)y_ms - (double)x_ms;
+								
+	return diff;
+}
+
 int main(int argc, char* argv[]) {
 
   // Get command line arguments
@@ -26,7 +38,9 @@ int main(int argc, char* argv[]) {
   char* message = argv[3];
   bool isFile = false;
   char text[BUFSIZ];
+  char txt[4096] = "";
   struct hostent *server;
+  struct timeval start, end;
 
   struct sockaddr_in saddr;
 
@@ -45,6 +59,8 @@ int main(int argc, char* argv[]) {
 	while(fgets(text, 150, fp)) {
 		i++;
 	}
+	strcat(text,"\0");
+	strcat(txt, text);
   }
 
   // Run socket
@@ -74,6 +90,7 @@ int main(int argc, char* argv[]) {
   // Get public key
   char* cpub = getPubKey();
 
+  gettimeofday(&start, NULL);
   // Sends the public key to the Server
   int s = sendto(sockfd, (const char *) cpub, BUFSIZ, 0, (const struct sockaddr *) &saddr, sizeof(saddr));
   if (s < 0) {
@@ -91,6 +108,7 @@ int main(int argc, char* argv[]) {
     exit(EXIT_FAILURE);
   }
   char* spub = decrypt(spub_rec);
+
 
   // Encrypt the message with the public key of the Server
   char* emess = "";
@@ -115,12 +133,14 @@ int main(int argc, char* argv[]) {
   // Receive checksum
   char* ocsum_s = malloc(4096);
   int y = recvfrom(sockfd, (char *) ocsum_s, 4096, MSG_DONTWAIT, (struct sockaddr *) &saddr, &l);
-  printf("Recieved checksum: %s\n", ocsum_s);
   if (y == 0) {
   	fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
   	close(sockfd);
   	exit(EXIT_FAILURE);
   }
+  gettimeofday(&end, NULL);
+  printf("RTT: %.00lf microseconds\n", time_diff(start, end));
+  printf("Recieved checksum: %s\n", csum_s);
   close(sockfd);
   return EXIT_SUCCESS;
 }
