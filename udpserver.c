@@ -13,11 +13,8 @@
 
 #include "pg1lib.h"
 
-#DEFINE SERVER_PORT 41026;
-
 const char SERVER_USAGE[] = \
   "Usage: ./udpserver 41026\n";
-
 
 bool comp_csum(unsigned long csum, unsigned long ocsum) {
   if (csum == ocsum)
@@ -28,7 +25,7 @@ bool comp_csum(unsigned long csum, unsigned long ocsum) {
 
 int main(int argc, char* argv[]) {
 
-  struct sockaddr_in addr;
+  struct sockaddr_in saddr, caddr;
   struct stat s;
 
   // Get command line arguments
@@ -41,13 +38,12 @@ int main(int argc, char* argv[]) {
 		.ai_flags = AI_PASSIVE
 	};
 
-   struct sockaddr saddr, caddr;
    saddr.sin_family = AF_INET;
    saddr.sin_addr.s_addr = INADDR_ANY:
-   saddr.sin_port = htons(port);                                       
+   saddr.sin_port = htons(port);
 
    int addr = getaddrinfo(hostname, port, &hints, &results);
-									  
+
   // Run socket
   int socket_fd = -1;
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -65,7 +61,8 @@ int main(int argc, char* argv[]) {
 
   // Recieve public key from client
   char cpub[BUFSIZ] = "";
-  if ((int t = recvfrom(sockfd, *cpub, BUFSIZ)) == 0) {
+  int l;
+  if ((int t = recvfrom(sockfd, *cpub, BUFSIZ, MSG_WAITALL, &caddr, &l)) == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
@@ -76,7 +73,7 @@ int main(int argc, char* argv[]) {
 
   // Encrypt and send the public key of the Server
   char epub[BUFSIZ] = encrypt(spub, cpub);
-  if ((int s = sendto(sockfd, epub, BUFSIZ)) < 0) {
+  if ((int s = sendto(sockfd, epub, BUFSIZ, MSG_CONFIRM, &caddr, l)) < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
@@ -84,7 +81,7 @@ int main(int argc, char* argv[]) {
 
   // Receive the message
   char emess[BUFSIZ] = "";
-  if ((int t = recvfrom(sockfd, *emess, BUFSIZ)) == 0) {
+  if ((int t = recvfrom(sockfd, *emess, BUFSIZ, MSG_WAITALL, &caddr, &l)) == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
@@ -95,7 +92,7 @@ int main(int argc, char* argv[]) {
 
   // Receive checksum
   unsigned long ocsum = 0;
-  if ((int t = recvfrom(sockfd, *ochecksum, BUFSIZ)) == 0) {
+  if ((int t = recvfrom(sockfd, *ochecksum, BUFSIZ, MSG_WAITALL, &caddr, &l)) == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);

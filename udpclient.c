@@ -35,12 +35,12 @@ int main(int argc, char* argv[]) {
 		.ai_flags = AI_PASSIVE
 		};
 
-  struct sockaddr saddr, caddr;
+  struct sockaddr_in saddr;
 
   saddr.sin_family = AF_INET;
   saddr.sin_addr.s_addr = INADDR_ANY:
   saddr.sin_port = htons(port);
-									  
+
 
   int addr = getaddrinfo(hostname, port, &hints, &results);
 
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
   char* cpub = getPubKey();
 
   // Sends the public key to the Server
-  int s = sendto(sockfd, cpub, BUFSIZ, MSG_CONFIRM, &results);
+  int s = sendto(sockfd, cpub, BUFSIZ, MSG_CONFIRM, &saddr, sizeof(saddr));
   if (s < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
@@ -75,7 +75,8 @@ int main(int argc, char* argv[]) {
 
   // Recieve and decrypt the public key of the Server
   char spub[BUFSIZ] = "";
-  if ((int t = recvfrom(sockfd, *spub, BUFSIZ)) == 0) {
+  int l;
+  if ((int t = recvfrom(sockfd, *spub, BUFSIZ, MSG_CONFIRM, &saddr, &l)) == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
@@ -89,18 +90,26 @@ int main(int argc, char* argv[]) {
   else {
     char emess[BUFSIZ] = encrypt(message, spub);
   }
-  if ((int s = sendto(sockfd, emess, BUFSIZ)) < 0) {
+  if ((int s = sendto(sockfd, emess, BUFSIZ, MSG_CONFIRM, &saddr, sizeof(saddr))) < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
   }
   // Send the checksum to the server
   unsigned long csum = checksum(message);
-  if ((int s = sendto(sockfd, csum, BUFSIZ)) < 0) {
+  if ((int s = sendto(sockfd, csum, BUFSIZ, MSG_CONFIRM, &saddr, sizeof(saddr))) < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
   }
+  unsigned long scsum;
   // Recieve the checksum and check it
+  if ((int t = recvfrom(sockfd, *scsum, BUFSIZ, MSG_CONFIRM, &saddr, &l)) == 0) {
+    fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
+
+  close(sockfd);
   return EXIT_SUCCESS;
 }
