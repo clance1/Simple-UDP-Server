@@ -51,13 +51,6 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  // Bind to the Server
-  if (bind(sockfd) < 0) {
-    fprintf(stderr, "ERROR: Binding error - %s\n", strerror(errno));
-    close(sockfd);
-    return EXIT_FAILURE;
-  }
-
   // Get public key
   char cpub[BIFSIZ] = getPubKey();
 

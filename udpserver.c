@@ -18,6 +18,14 @@
 const char SERVER_USAGE[] = \
   "Usage: ./udpserver 41026\n";
 
+
+bool comp_csum(unsigned long csum, unsigned long ocsum) {
+  if (csum == ocsum)
+    return true;
+  else
+    return false;
+}
+
 int main(int argc, char* argv[]) {
 
   struct sockaddr_in addr;
@@ -34,13 +42,12 @@ int main(int argc, char* argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  // Bind to the Client
+  // Bind
   if (bind(sockfd) < 0) {
     fprintf(stderr, "ERROR: Binding error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
   }
-
 
   // Recieve public key from client
   char cpub[BUFSIZ] = "";
@@ -61,7 +68,28 @@ int main(int argc, char* argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  // Receive the message
+  char emess[BUFSIZ] = "";
+  if ((int t = recvfrom(sockfd, *emess, BUFSIZ)) == 0) {
+    fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
 
+  // Decrypt message
+  char *mess = decrypt(emess);
+
+  // Receive checksum
+  unsigned long ocsum = 0;
+  if ((int t = recvfrom(sockfd, *ochecksum, BUFSIZ)) == 0) {
+    fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
+    close(sockfd);
+    exit(EXIT_FAILURE);
+  }
+
+  // Generate new checksum and compare
+  unsigned long csum = checksum(mess);
+  if ()
 
   return EXIT_SUCCESS;
 }
