@@ -84,10 +84,12 @@ int main(int argc, char* argv[]) {
 
   // Decrypt message
   char *mess = decrypt(emess);
+  printf("Message: %s\n", mess);
 
   // Receive checksum
   unsigned long ocsum = 0;
   int y = recvfrom(sockfd, (const char *) ocsum, BUFSIZ, MSG_WAITALL, (const struct sockaddr *) &caddr, &l);
+  printf("Recieved checksum: %d\n", ocsum);
   if (y == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);

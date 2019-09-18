@@ -103,6 +103,7 @@ int main(int argc, char* argv[]) {
   // Send the checksum to the server
   unsigned long csum = checksum(message);
   int x = sendto(sockfd, (const char *) csum, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
+  printf("Sending Checksum: %d\n", csum);
   if (x < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
@@ -116,6 +117,7 @@ int main(int argc, char* argv[]) {
     close(sockfd);
     exit(EXIT_FAILURE);
   }
+  printf("Recieved checksum: %d\n", scsum);
 
   close(sockfd);
   return EXIT_SUCCESS;
