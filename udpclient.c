@@ -5,6 +5,8 @@
 #include <string.h>
 #include <errno.h>
 #include <netdb.h>
+#include <fcntl.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -13,38 +15,47 @@
 
 #include "pg1lib.h"
 
-#DEFINE SERVER_PORT 41026;
-
 const char CLIENT_USAGE[] = \
   "Usage: ./udpclient student0[0/1/2/6].cse.nd.edu 41026 [filename.txt or \"message\"]";
 
 int main(int argc, char* argv[]) {
 
-  struct sockaddr_in addr;
-  struct stat s;
-
   // Get command line arguments
   char* hostname = argv[1];
-  int port = atoi(argv[2]);
+  int port = stoi(argv[2]);
   char* message = argv[3];
   bool isFile = false;
 
   char* file_end = ".txt";
 
+  struct addrinfo *results;
+  struct addrinfo hints = {
+		.ai_family = AF_UNSPEC,
+		.ai_socktype = SOCK_STREAM,
+		.ai_flags = AI_PASSIVE
+		};
+
+  struct sockaddr saddr, caddr;
+
+  saddr.sin_family = AF_INET;
+  saddr.sin_addr.s_addr = INADDR_ANY:
+  saddr.sin_port = htons(port);
+									  
+
+  int addr = getaddrinfo(hostname, port, &hints, &results);
+
   if (strstr(message, file_end) != NULL) {
     isFile = true;
-    if ((int fd = open(message, O_RDONLY) < 0) {
+	int fd = open(message, O_RDONLY);
+    if (fd < 0) {
       fprintf(stderr, "ERROR: Opening message - %s\n", strerror(errno));
       close(fd);
       return EXIT_FAILURE;
     }
   }
 
-  addr.sin_family = AF_INET;
-  addr.
-
   // Run socket
-  int socket_fd = -1;
+  int sockfd = -1;
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sockfd < 0) {
     fprintf(stderr, "ERROR: Socket error - %s\n", strerror(errno));
@@ -52,10 +63,11 @@ int main(int argc, char* argv[]) {
   }
 
   // Get public key
-  char cpub[BIFSIZ] = getPubKey();
+  char* cpub = getPubKey();
 
   // Sends the public key to the Server
-  if ((int s = sendto(sockfd, cpub, BUFSIZ)) < 0) {
+  int s = sendto(sockfd, cpub, BUFSIZ, MSG_CONFIRM, &results);
+  if (s < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
@@ -68,7 +80,7 @@ int main(int argc, char* argv[]) {
     close(sockfd);
     exit(EXIT_FAILURE);
   }
-  char spub[BUFSIZ] = decrypt(spub);
+  char* spub = decrypt(spub);
 
   // Encrypt the message with the public key of the Server
   if (isFile) {
