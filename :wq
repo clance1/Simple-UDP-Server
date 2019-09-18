@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
   while (1) {
   // Recieve public key from client
   char cpub[BUFSIZ] = "";
-  socklen_t l = sizeof(caddr);
+  int l = sizeof(caddr);
   printf("Waiting for public key\n");
   int t = recvfrom(sockfd, cpub, 4096, 0, (struct sockaddr *) &caddr, &l);
   if (t == 0) {
@@ -77,9 +77,9 @@ int main(int argc, char* argv[]) {
   printf("Message: %s\n", mess);
 
   // Receive checksum
-  char* ocsum_s = malloc(4096);
-  int y = recvfrom(sockfd, (char *) ocsum_s, 4096, MSG_DONTWAIT, (struct sockaddr *) &caddr, &l);
-  printf("Recieved checksum: %s\n", ocsum_s);
+  char* o_csum = malloc(4096);
+  int y = recvfrom(sockfd, o_csum, 4096, MSG_DONTWAIT, (struct sockaddr *) &caddr, &l);
+  printf("Recieved checksum: %ul\n", o_csum);
   if (y == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
@@ -87,21 +87,18 @@ int main(int argc, char* argv[]) {
   }
 
   char *ptr;
-  unsigned long int ocsum = strtoul(ocsum_s, &ptr, 10);
+  unsigned long int ocsum = strtoul(o_csum, &ptr, 10);
 
   // Generate new checksum and compare
-  unsigned long csum = checksum(mess);
-  printf("Generated checksum: %lu\n", ocsum);
-  if (csum != ocsum) {
+  unsigned long int csum = checksum(mess);
+  printf("Generated checksum: %ul\n", csum);
+  if (csum == ocsum) {
 	  printf("Error: Wrong Checksum\n");
-	  sendto(sockfd, (const char *) csum, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &caddr, sizeof(saddr));
+	  sendto(sockfd, (const char *) csum, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &caddr, &l);
   }	  
   else {
 	  printf("Checksums match!\n");
-	  char* csum_s = malloc(4096);
-	  sprintf(csum_s, "%lu", csum);
-	  printf("CHAR: %s\n", csum_s);
-	  sendto(sockfd, (const char *) csum_s, BUFSIZ, 0, (const struct sockaddr *) &caddr, sizeof(saddr));
+	  sendto(sockfd, (const char *) csum, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &caddr, &l);
   }
   }
   close(sockfd);

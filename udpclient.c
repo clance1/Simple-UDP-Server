@@ -25,16 +25,8 @@ int main(int argc, char* argv[]) {
   int port = atoi(argv[2]);
   char* message = argv[3];
   bool isFile = false;
-  int fd;
-
-  char* file_end = ".txt";
-
-  struct addrinfo *results;
-  struct addrinfo hints = {
-		.ai_family = AF_UNSPEC,
-		.ai_socktype = SOCK_STREAM,
-		.ai_flags = AI_PASSIVE
-		};
+  char text[BUFSIZ];
+  struct hostent *server;
 
   struct sockaddr_in saddr;
 
@@ -42,17 +34,17 @@ int main(int argc, char* argv[]) {
   saddr.sin_addr.s_addr = INADDR_ANY;
   saddr.sin_port = htons(port);
 
+  struct stat st;
 
-  int addr = getaddrinfo(hostname, port, &hints, &results);
-
-  if (strstr(message, file_end) != NULL) {
+  if (stat(message, &st) >= 0) {
     isFile = true;
-	fd = open(message, O_RDONLY);
-    if (fd < 0) {
-      fprintf(stderr, "ERROR: Opening message - %s\n", strerror(errno));
-      close(fd);
-      return EXIT_FAILURE;
-    }
+	printf("File name: %s\n", message);
+    FILE *fp = fopen(message, "r");
+	int i = 0;
+	
+	while(fgets(text, 150, fp)) {
+		i++;
+	}
   }
 
   // Run socket
@@ -60,14 +52,30 @@ int main(int argc, char* argv[]) {
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sockfd < 0) {
     fprintf(stderr, "ERROR: Socket error - %s\n", strerror(errno));
+	close(sockfd);
     return EXIT_FAILURE;
   }
+
+  server = gethostbyname(hostname);
+  if (server == NULL) {
+	  fprintf(stderr, "ERROR: Finding host - %s\n", strerror(errno));
+	  close(sockfd);
+	  return EXIT_FAILURE;
+  }
+
+
+  bzero((char *) &saddr, sizeof(saddr));
+  saddr.sin_family = AF_INET;
+  bcopy((char*) server->h_addr, (char*) &saddr.sin_addr.s_addr, server->h_length);
+  saddr.sin_port = htons(port);
+
+  socklen_t l = sizeof(saddr);
 
   // Get public key
   char* cpub = getPubKey();
 
   // Sends the public key to the Server
-  int s = sendto(sockfd, (const char *) cpub, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
+  int s = sendto(sockfd, (const char *) cpub, BUFSIZ, 0, (const struct sockaddr *) &saddr, sizeof(saddr));
   if (s < 0) {
     fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
     close(sockfd);
@@ -76,9 +84,8 @@ int main(int argc, char* argv[]) {
 
   // Recieve and decrypt the public key of the Server
   char spub_rec[BUFSIZ] = "";
-  int l;
-  int t = recvfrom(sockfd, (char *) spub_rec, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &saddr, &l);
-  if (s == 0) {
+  int t = recvfrom(sockfd, (char *) spub_rec, BUFSIZ, 0, (struct sockaddr *) &saddr, &l);
+  if (t == 0) {
     fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
     close(sockfd);
     exit(EXIT_FAILURE);
@@ -88,37 +95,32 @@ int main(int argc, char* argv[]) {
   // Encrypt the message with the public key of the Server
   char* emess = "";
   if (isFile) {
-    emess = encrypt(fd, cpub);
+    emess = encrypt(text, cpub);
+	printf("Message sending:\n%s\n",text);
   }
   else {
+	printf("Message sending:\n%s\n",message);
     emess = encrypt(message, spub);
   }
 
-  int r = sendto(sockfd, (const char *) emess, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
-  if (r < 0) {
-    fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
-    close(sockfd);
-    exit(EXIT_FAILURE);
-  }
+  sendto(sockfd, (const char *) emess, BUFSIZ, 0, (const struct sockaddr *) &saddr, sizeof(saddr));
+  
   // Send the checksum to the server
   unsigned long csum = checksum(message);
-  int x = sendto(sockfd, (const char *) csum, BUFSIZ, MSG_CONFIRM, (const struct sockaddr *) &saddr, sizeof(saddr));
-  printf("Sending Checksum: %d\n", csum);
-  if (x < 0) {
-    fprintf(stderr, "ERROR: Sending error - %s\n", strerror(errno));
-    close(sockfd);
-    exit(EXIT_FAILURE);
-  }
-  unsigned long scsum;
-  // Recieve the checksum and check it
-  int y = recvfrom(sockfd, (char *) scsum, BUFSIZ, MSG_CONFIRM, (struct sockaddr *) &saddr, &l);
+  printf("Checksum Sent: %lu\n", csum);
+  char * csum_s = malloc(4096);
+  sprintf(csum_s, "%lu", csum);
+  sendto(sockfd, (const char *) csum_s, BUFSIZ, 0, (const struct sockaddr *) &saddr, sizeof(saddr));
+  
+  // Receive checksum
+  char* ocsum_s = malloc(4096);
+  int y = recvfrom(sockfd, (char *) ocsum_s, 4096, MSG_DONTWAIT, (struct sockaddr *) &saddr, &l);
+  printf("Recieved checksum: %s\n", ocsum_s);
   if (y == 0) {
-    fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
-    close(sockfd);
-    exit(EXIT_FAILURE);
+  	fprintf(stderr, "ERROR: Recieving error - %s\n", strerror(errno));
+  	close(sockfd);
+  	exit(EXIT_FAILURE);
   }
-  printf("Recieved checksum: %d\n", scsum);
-
   close(sockfd);
   return EXIT_SUCCESS;
 }
